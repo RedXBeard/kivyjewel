@@ -1,0 +1,36 @@
+#:import get_color_from_hex kivy.utils.get_color_from_hex
+
+<Label>
+    canvas.before:
+        Color:
+            rgba: get_color_from_hex('E2DDD5')
+        Rectangle:
+            pos: self.pos
+            size: self.size
+
+<Board>
+
+<KivyJewel>
+    cols: 1
+    rows: 2
+    spacing: 5, 5
+
+    visual_score_label: visual_score_label
+    board: board
+    Label:
+        id: visual_score_label
+        text: '%s'%str(root.score)
+        color: get_color_from_hex('58CB85')
+        size_hint: 1, None
+        valign: "middle"
+        height: 50
+        font_size: 30
+        text_size: self.width, None
+        halign: 'right'
+
+    Board:
+        id: board
+        cols: 10
+        rows: 10
+        spacing: 3, 3
+        padding: 0
