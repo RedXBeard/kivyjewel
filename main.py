@@ -22,7 +22,7 @@ COLOR = [
     get_color_from_hex('9C9425'),  # Yellow
     get_color_from_hex('828677'),  # Grey
 ]
-# COLOR = map(lambda x: x[:3] + [.7], COLOR)
+COLOR = map(lambda x: x[:3] + [.9], COLOR)
 
 
 def get_color(obj):
@@ -107,7 +107,8 @@ class CustomScatter(Scatter):
 
     def get_neighbour(self, col, row):
         neighbour = None
-        if col >= 0:
+        if (len(self.parent.cols_fill) > col >= 0 and
+                len(self.parent.cols_fill[col]) > row >= 0):
             neighbour = self.parent.cols_fill[col][row]
         return neighbour
 
@@ -127,12 +128,48 @@ class Board(FloatLayout):
     rows = NumericProperty(0)
     cols_fill = ListProperty([])
 
+    def clear_bubble(self):
+        bulk = []
+        for i in range(0, len(COLOR)):
+            same_colored = map(
+                lambda x: filter(
+                    lambda y: y.color_val == i, x), self.cols_fill)
+            print map(
+                lambda x: (x.col, x.row, x.children[0].text),
+                reduce(lambda x, y: x + y, same_colored))
+            break
+
 
 class KivyJewel(GridLayout):
     score = NumericProperty(0)
 
     def __init__(self, *args, **kwargs):
         super(KivyJewel, self).__init__(*args, **kwargs)
+
+    def fill_column(self, *args, **kwargs):
+        column = kwargs.get('column')
+        index = kwargs.get('index', 0)
+        board = self.board
+        try:
+            row = column[index]
+        except IndexError:
+            return
+        board.add_widget(row)
+        anim = Animation(
+            x=row.pre_pos[0], y=row.pre_pos[1],
+            t='linear', duration=.1)
+        anim.fbind('on_complete', self.fill_column, column=column, index=index + 1)
+        anim.start(row)
+
+    def fill_columns(self):
+        board = self.board
+        for col in board.cols_fill:
+            tmp = []
+            for row in col:
+                row.pos = (row.pre_pos[0], 500)
+                tmp.append(row)
+            self.fill_column(column=tmp)
+        board.clear_bubble()
 
     def prepare_board(self, size, padding):
         board = self.board
@@ -144,29 +181,33 @@ class KivyJewel(GridLayout):
                 col = (label_count / board.rows)
                 row = (label_count % board.rows)
                 pos = ((col * (size[0] + 5)) + padding,
-                       (row * (size[0] + 5)) + 5)
+                       (row * (size[0] + 5)) + 50)
                 scatter = CustomScatter(
                     size=size, size_hint=(None, None), pos=pos)
                 scatter.row = row
                 scatter.col = col
                 scatter.pre_pos = pos
-                label = Label(text=str(""), size_hint=(None, None), size=size)
+                label = Label(text=str(i), size_hint=(None, None), size=size)
                 label.space = size[0] * 10 / 45
-                set_color(label, choice(COLOR))
+                color = choice(COLOR)
+                color_index = COLOR.index(color)
+                set_color(label, color)
+                scatter.color_val = color_index
                 scatter.add_widget(label)
-                board.add_widget(scatter)
+                # board.add_widget(scatter)
                 label_count += 1
                 tmp.setdefault(col, [])
                 tmp[col].append(scatter)
             for i in range(0, board.cols):
                 board.cols_fill.append(tmp[i])
+            self.fill_columns()
         else:
             label_count = (board.rows * board.cols) - 1
             for widget in board.children:
                 col = (label_count / board.rows)
                 row = (label_count % board.rows)
                 pos = ((col * (size[0] + 5)) + padding,
-                       (row * (size[0] + 5)))
+                       (row * (size[0] + 5)) + 50)
                 widget.size = size
                 widget.pos = widget.pre_pos = pos
                 for child in widget.children:
@@ -180,11 +221,11 @@ class KivyJewel(GridLayout):
 
     def resize_all(self, width, height):
         size = [
-            min(width, height - (85 + 5 * self.board.cols)) /
+            min(width, height - (150 + 5 * self.board.cols)) /
             self.board.cols] * 2
         padding = (
             width - (size[0] * self.board.cols + 5 * self.board.cols)) / 2
-        self.board.padding = (padding + 15, 50, padding, 10)
+        self.board.padding = (padding + 15, 50, padding, 50)
         self.prepare_board(size, padding)
 
 
