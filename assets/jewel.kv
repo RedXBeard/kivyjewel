@@ -1,27 +1,33 @@
 #:import get_color_from_hex kivy.utils.get_color_from_hex
 
 <Label>
+    space: 10
     canvas.before:
         Color:
             rgba: get_color_from_hex('E2DDD5')
         Rectangle:
-            pos: self.pos[0], self.pos[1]+5
-            size: self.size[0], self.size[1]-10
+            pos: self.pos[0], self.pos[1]+self.space/2
+            size: self.size[0], self.size[1]-self.space
         Rectangle:
-            pos: self.pos[0]+5, self.pos[1]
-            size: self.size[0]-10, self.size[1]
+            pos: self.pos[0]+self.space/2, self.pos[1]
+            size: self.size[0]-self.space, self.size[1]
         Ellipse:
-            size: 10, 10
+            size: self.space, self.space
             pos: self.pos[0], self.pos[1]
         Ellipse:
-            size: 10, 10
-            pos: self.pos[0], self.pos[1]+self.height-10
+            size: self.space, self.space
+            pos: self.pos[0], self.pos[1]+self.height-self.space
         Ellipse:
-            size: 10, 10
-            pos: self.pos[0]+self.width-10, self.pos[1]
+            size: self.space, self.space
+            pos: self.pos[0]+self.width-self.space, self.pos[1]
         Ellipse:
-            size: 10, 10
-            pos: self.pos[0]+self.width-10, self.pos[1]+self.height-10
+            size: self.space, self.space
+            pos: self.pos[0]+self.width-self.space, self.pos[1]+self.height-self.space
+
+<CustomScatter>
+    pre_pos: 0, 0
+    row: 0
+    col: 0
 
 <KivyJewel>
     cols: 1
@@ -45,4 +51,3 @@
         cols: 10
         rows: 10
         spacing: 3, 3
-        padding: 0

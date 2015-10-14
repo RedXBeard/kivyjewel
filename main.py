@@ -1,14 +1,15 @@
 __version__ = '1.0.0'
 
 from kivy.app import App
+from kivy.animation import Animation
 from kivy.lang import Builder
 from kivy.utils import get_color_from_hex
 from kivy.core.window import Window
+from kivy.properties import NumericProperty, ListProperty
+from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.gridlayout import GridLayout
-from kivy.properties import NumericProperty
 from kivy.uix.label import Label
 from kivy.uix.scatter import Scatter
-from kivy.uix.floatlayout import FloatLayout
 
 from random import choice
 
@@ -21,6 +22,7 @@ COLOR = [
     get_color_from_hex('9C9425'),  # Yellow
     get_color_from_hex('828677'),  # Grey
 ]
+# COLOR = map(lambda x: x[:3] + [.7], COLOR)
 
 
 def get_color(obj):
@@ -42,9 +44,88 @@ def set_color(obj, color):
         pass
 
 
+class CustomScatter(Scatter):
+    def on_transform_with_touch(self, touch):
+        """take action when shape touched."""
+        super(CustomScatter, self).on_transform_with_touch(touch)
+
+        pre_x, pre_y = self.pre_pos
+        touch_x, touch_y = self.pos
+
+        if abs(pre_x - touch_x) > abs(pre_y - touch_y):
+            if abs(pre_x - touch_x) > self.size[0] + 5:
+                self.reset_board(touch)
+            else:
+                try:
+                    if touch_x > pre_x:
+                        neighbour = self.parent.cols_fill[self.col + 1][self.row]
+                        neighbour.pos = [(neighbour.pre_pos[0] -
+                                          abs(pre_x - touch_x)),
+                                         neighbour.pre_pos[1]]
+                    else:
+                        if self.col - 1 < 0:
+                            raise IndexError
+                        neighbour = self.parent.cols_fill[self.col - 1][self.row]
+                        neighbour.pos = [(neighbour.pre_pos[0] +
+                                          abs(pre_x - touch_x)),
+                                         neighbour.pre_pos[1]]
+                except IndexError:
+                    pass
+                self.pos = [touch_x, pre_y]
+
+        else:
+            if abs(pre_y - touch_y) > self.size[1] + 5:
+                self.reset_board(touch)
+            else:
+                try:
+                    if touch_y > pre_y:
+                        neighbour = self.parent.cols_fill[self.col][self.row + 1]
+                        neighbour.pos = [neighbour.pre_pos[0],
+                                         (neighbour.pre_pos[1] -
+                                          abs(pre_y - touch_y))]
+                    else:
+                        neighbour = self.parent.cols_fill[self.col][self.row - 1]
+                        neighbour.pos = [neighbour.pre_pos[0],
+                                         (neighbour.pre_pos[1] +
+                                          abs(pre_y - touch_y))]
+                except IndexError:
+                    pass
+                self.pos = [pre_x, touch_y]
+
+    def on_bring_to_front(self, touch):
+        super(CustomScatter, self).on_bring_to_front(touch)
+
+    def on_touch_up(self, touch):
+        super(CustomScatter, self).on_touch_up(touch)
+        anim = Animation(
+            x=self.pre_pos[0], y=self.pre_pos[1],
+            t='linear', duration=.2)
+        anim.start(self)
+
+    def on_touch_down(self, touch):
+        super(CustomScatter, self).on_touch_down(touch)
+
+    def get_neighbour(self, col, row):
+        neighbour = None
+        if col >= 0:
+            neighbour = self.parent.cols_fill[col][row]
+        return neighbour
+
+    def reset_board(self, touch):
+        neighbours = [self,
+                      self.get_neighbour(self.col + 1, self.row),
+                      self.get_neighbour(self.col - 1, self.row),
+                      self.get_neighbour(self.col, self.row + 1),
+                      self.get_neighbour(self.col, self.row - 1)]
+        for neighbour in neighbours:
+            if neighbour:
+                neighbour.on_touch_up(touch)
+
+
 class Board(FloatLayout):
     cols = NumericProperty(0)
     rows = NumericProperty(0)
+    cols_fill = ListProperty([])
 
 
 class KivyJewel(GridLayout):
@@ -55,36 +136,55 @@ class KivyJewel(GridLayout):
 
     def prepare_board(self, size, padding):
         board = self.board
+        board.coll_fill = []
+        tmp = {}
         if not board.children:
             label_count = 0
             for i in range(0, board.rows * board.cols):
-                pos = (((label_count / board.rows) * (size[0] + 5)) + padding,
-                       ((label_count % board.rows) * (size[0] + 5)) + 5)
-                scatter = Scatter(
+                col = (label_count / board.rows)
+                row = (label_count % board.rows)
+                pos = ((col * (size[0] + 5)) + padding,
+                       (row * (size[0] + 5)) + 5)
+                scatter = CustomScatter(
                     size=size, size_hint=(None, None), pos=pos)
+                scatter.row = row
+                scatter.col = col
+                scatter.pre_pos = pos
                 label = Label(text=str(""), size_hint=(None, None), size=size)
+                label.space = size[0] * 10 / 45
                 set_color(label, choice(COLOR))
                 scatter.add_widget(label)
                 board.add_widget(scatter)
                 label_count += 1
+                tmp.setdefault(col, [])
+                tmp[col].append(scatter)
+            for i in range(0, board.cols):
+                board.cols_fill.append(tmp[i])
         else:
             label_count = (board.rows * board.cols) - 1
             for widget in board.children:
-                pos = (((label_count / board.rows) * (size[0] + 5)) + padding,
-                       ((label_count % board.rows) * (size[0] + 5)) + 5)
+                col = (label_count / board.rows)
+                row = (label_count % board.rows)
+                pos = ((col * (size[0] + 5)) + padding,
+                       (row * (size[0] + 5)))
                 widget.size = size
-                widget.pos = pos
+                widget.pos = widget.pre_pos = pos
                 for child in widget.children:
                     child.size = size
+                    child.space = size[0] * 10 / 45
                 label_count -= 1
+                tmp.setdefault(col, [])
+                tmp[col].append(widget)
+            for i in range(0, board.cols):
+                board.cols_fill.append(tmp[i])
 
     def resize_all(self, width, height):
         size = [
-            min(width, height - (105 + 5 * self.board.cols)) /
+            min(width, height - (85 + 5 * self.board.cols)) /
             self.board.cols] * 2
         padding = (
             width - (size[0] * self.board.cols + 5 * self.board.cols)) / 2
-        self.board.padding = padding
+        self.board.padding = (padding + 15, 50, padding, 10)
         self.prepare_board(size, padding)
 
 
