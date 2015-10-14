@@ -5,10 +5,23 @@
         Color:
             rgba: get_color_from_hex('E2DDD5')
         Rectangle:
-            pos: self.pos
-            size: self.size
-
-<Board>
+            pos: self.pos[0], self.pos[1]+5
+            size: self.size[0], self.size[1]-10
+        Rectangle:
+            pos: self.pos[0]+5, self.pos[1]
+            size: self.size[0]-10, self.size[1]
+        Ellipse:
+            size: 10, 10
+            pos: self.pos[0], self.pos[1]
+        Ellipse:
+            size: 10, 10
+            pos: self.pos[0], self.pos[1]+self.height-10
+        Ellipse:
+            size: 10, 10
+            pos: self.pos[0]+self.width-10, self.pos[1]
+        Ellipse:
+            size: 10, 10
+            pos: self.pos[0]+self.width-10, self.pos[1]+self.height-10
 
 <KivyJewel>
     cols: 1
@@ -22,10 +35,9 @@
         text: '%s'%str(root.score)
         color: get_color_from_hex('58CB85')
         size_hint: 1, None
-        valign: "middle"
+        halign: "center"
         height: 50
         font_size: 30
-        text_size: self.width, None
         halign: 'right'
 
     Board:

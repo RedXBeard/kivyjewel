@@ -5,7 +5,7 @@ from kivy.lang import Builder
 from kivy.utils import get_color_from_hex
 from kivy.core.window import Window
 from kivy.uix.gridlayout import GridLayout
-from kivy.properties import NumericProperty, ListProperty
+from kivy.properties import NumericProperty
 from kivy.uix.label import Label
 from kivy.uix.scatter import Scatter
 from kivy.uix.floatlayout import FloatLayout
@@ -13,20 +13,14 @@ from kivy.uix.floatlayout import FloatLayout
 from random import choice
 
 COLOR = [
-    get_color_from_hex('DC6555'),  # red
-    get_color_from_hex('5BBEE5'),  # light blue
-    # get_color_from_hex('448FC4'),
-    # get_color_from_hex('6FE5FE'),
-    # get_color_from_hex('50B5D5'),
-    get_color_from_hex('EC9449'),  # orange1
-    # get_color_from_hex('FFC658'),
-    # get_color_from_hex('E57D4F'),
-    # get_color_from_hex('C25041'),
-    # get_color_from_hex('FF8271'),
-    get_color_from_hex('FFC63E'),  # yellow2
-    get_color_from_hex('4DD5B0'),  # green2
-    get_color_from_hex('7B8ED4'),  # purple1
-    get_color_from_hex('E86981')]  # pink
+    get_color_from_hex('D15F21'),  # Orange
+    get_color_from_hex('0C4DA7'),  # Blue
+    get_color_from_hex('C32D2C'),  # Red
+    get_color_from_hex('C731C4'),  # Purple
+    get_color_from_hex('089C00'),  # Green
+    get_color_from_hex('9C9425'),  # Yellow
+    get_color_from_hex('828677'),  # Grey
+]
 
 
 def get_color(obj):
@@ -64,8 +58,8 @@ class KivyJewel(GridLayout):
         if not board.children:
             label_count = 0
             for i in range(0, board.rows * board.cols):
-                pos = (((label_count / board.rows) * (size[0] + 3)) + padding,
-                       ((label_count % board.rows) * (size[0] + 3)) + 3)
+                pos = (((label_count / board.rows) * (size[0] + 5)) + padding,
+                       ((label_count % board.rows) * (size[0] + 5)) + 5)
                 scatter = Scatter(
                     size=size, size_hint=(None, None), pos=pos)
                 label = Label(text=str(""), size_hint=(None, None), size=size)
@@ -76,8 +70,8 @@ class KivyJewel(GridLayout):
         else:
             label_count = (board.rows * board.cols) - 1
             for widget in board.children:
-                pos = (((label_count / board.rows) * (size[0] + 3)) + padding,
-                       ((label_count % board.rows) * (size[0] + 3)) + 3)
+                pos = (((label_count / board.rows) * (size[0] + 5)) + padding,
+                       ((label_count % board.rows) * (size[0] + 5)) + 5)
                 widget.size = size
                 widget.pos = pos
                 for child in widget.children:
@@ -86,10 +80,10 @@ class KivyJewel(GridLayout):
 
     def resize_all(self, width, height):
         size = [
-            min(width, height - (55 + 3 * self.board.cols)) /
+            min(width, height - (105 + 5 * self.board.cols)) /
             self.board.cols] * 2
         padding = (
-            width - (size[0] * self.board.cols + 3 * self.board.cols)) / 2
+            width - (size[0] * self.board.cols + 5 * self.board.cols)) / 2
         self.board.padding = padding
         self.prepare_board(size, padding)
 
@@ -121,4 +115,5 @@ class KivyJewelApp(App):
 if __name__ == '__main__':
     # Config.set('kivy', 'desktop', 1)
     # Config.set('input', 'mouse', 'mouse,multitouch_on_demand')
+    Window.clearcolor = get_color_from_hex('303030')
     KivyJewelApp().run()
