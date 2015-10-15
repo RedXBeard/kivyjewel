@@ -45,6 +45,10 @@ def set_color(obj, color):
 
 
 class CustomScatter(Scatter):
+
+    def __unicode__(self):
+        return "%s-%s -> %s" % (self.col, self.row, self.children[0].text)
+
     def on_transform_with_touch(self, touch):
         """take action when shape touched."""
         super(CustomScatter, self).on_transform_with_touch(touch)
@@ -54,6 +58,10 @@ class CustomScatter(Scatter):
 
         if abs(pre_x - touch_x) > abs(pre_y - touch_y):
             if abs(pre_x - touch_x) > self.size[0] + 5:
+                self.reset_board(touch)
+            elif ((self.col == 0 and pre_x - touch_x > 0) or
+                  (self.col == self.parent.cols - 1 and
+                   pre_x - touch_x < 0)):
                 self.reset_board(touch)
             else:
                 try:
@@ -75,6 +83,10 @@ class CustomScatter(Scatter):
 
         else:
             if abs(pre_y - touch_y) > self.size[1] + 5:
+                self.reset_board(touch)
+            elif ((self.row == 0 and pre_y - touch_y > 0) or
+                  (self.row == self.parent.rows - 1 and
+                   pre_y - touch_y < 0)):
                 self.reset_board(touch)
             else:
                 try:
@@ -131,13 +143,51 @@ class Board(FloatLayout):
     def clear_bubble(self):
         bulk = []
         for i in range(0, len(COLOR)):
-            same_colored = map(
+            same_colored = reduce(lambda x, y: x + y, (map(
                 lambda x: filter(
-                    lambda y: y.color_val == i, x), self.cols_fill)
-            print map(
-                lambda x: (x.col, x.row, x.children[0].text),
-                reduce(lambda x, y: x + y, same_colored))
-            break
+                    lambda y: y.color_val == i, x), self.cols_fill)))
+
+            for point in same_colored:
+                same_column = filter(
+                    lambda x: x.col == point.col, same_colored)
+                same_row = filter(
+                    lambda x: x.row == point.row, same_colored)
+                if len(same_column) > 2:
+                    ordered = sorted(same_column, key=lambda x: x.row)
+                    i = 0
+                    while i < len(ordered):
+                        possible_points = ordered[i:i + 3]
+                        if len(possible_points) > 2:
+                            start_point = possible_points[0]
+                            points = map(lambda x: x.row, possible_points)
+                            if not bool(set(range(
+                                    start_point.row,
+                                    start_point.row + 3)).difference(
+                                        set(points))):
+                                bulk.extend(possible_points)
+                        else:
+                            break
+                        i += 1
+
+                if len(same_row) > 2:
+                    ordered = sorted(same_row, key=lambda x: x.col)
+                    i = 0
+                    while i < len(ordered):
+                        possible_points = ordered[i:i + 3]
+                        if len(possible_points) > 2:
+                            start_point = possible_points[0]
+                            points = map(lambda x: x.col, possible_points)
+                            if not bool(set(range(
+                                    start_point.col,
+                                    start_point.col + 3)).difference(
+                                        set(points))):
+                                bulk.extend(possible_points)
+                        else:
+                            break
+                        i += 1
+
+        for scatter in bulk:
+            set_color(scatter.children[0], get_color_from_hex('000000'))
 
 
 class KivyJewel(GridLayout):
@@ -202,10 +252,9 @@ class KivyJewel(GridLayout):
                 board.cols_fill.append(tmp[i])
             self.fill_columns()
         else:
-            label_count = (board.rows * board.cols) - 1
             for widget in board.children:
-                col = (label_count / board.rows)
-                row = (label_count % board.rows)
+                col = widget.col
+                row = widget.row
                 pos = ((col * (size[0] + 5)) + padding,
                        (row * (size[0] + 5)) + 50)
                 widget.size = size
@@ -213,11 +262,8 @@ class KivyJewel(GridLayout):
                 for child in widget.children:
                     child.size = size
                     child.space = size[0] * 10 / 45
-                label_count -= 1
                 tmp.setdefault(col, [])
                 tmp[col].append(widget)
-            for i in range(0, board.cols):
-                board.cols_fill.append(tmp[i])
 
     def resize_all(self, width, height):
         size = [
