@@ -5,6 +5,7 @@ from kivy.animation import Animation
 from kivy.lang import Builder
 from kivy.utils import get_color_from_hex
 from kivy.core.window import Window
+from kivy.clock import Clock
 from kivy.properties import NumericProperty, ListProperty
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.gridlayout import GridLayout
@@ -47,7 +48,7 @@ def set_color(obj, color):
 class CustomScatter(Scatter):
 
     def __unicode__(self):
-        return "%s-%s -> %s" % (self.col, self.row, self.children[0].text)
+        return "%s-%s -> %s" % (self.col, self.row, self.color_val)
 
     def on_transform_with_touch(self, touch):
         """take action when shape touched."""
@@ -60,7 +61,8 @@ class CustomScatter(Scatter):
             if abs(pre_x - touch_x) > self.size[0] + 5:
                 self.reset_board(touch)
             elif ((self.col == 0 and pre_x - touch_x > 0) or
-                  (self.col == self.parent.cols - 1 and
+                  (self.parent and
+                   self.col == self.parent.cols - 1 and
                    pre_x - touch_x < 0)):
                 self.reset_board(touch)
             else:
@@ -77,6 +79,16 @@ class CustomScatter(Scatter):
                         neighbour.pos = [(neighbour.pre_pos[0] +
                                           abs(pre_x - touch_x)),
                                          neighbour.pre_pos[1]]
+
+                    if (abs(int(neighbour.pos[0]) - int(self.pos[0])) >
+                            self.size[0] / 2):
+                        self.swap(neighbour)
+                        lines = self.get_line() + neighbour.get_line()
+                        columns = self.get_column() + neighbour.get_column()
+                        if not self.parent.check_bubbles(
+                                lines=lines, columns=columns, check=True):
+                            self.swap(neighbour)
+                        self.reset_board(touch)
                 except IndexError:
                     pass
                 self.pos = [touch_x, pre_y]
@@ -100,6 +112,16 @@ class CustomScatter(Scatter):
                         neighbour.pos = [neighbour.pre_pos[0],
                                          (neighbour.pre_pos[1] +
                                           abs(pre_y - touch_y))]
+
+                    if (abs(int(neighbour.pos[1]) - int(self.pos[1])) >
+                            self.size[1] / 2):
+                        self.swap(neighbour)
+                        lines = self.get_line() + neighbour.get_line()
+                        columns = self.get_column() + neighbour.get_column()
+                        if not self.parent.check_bubbles(
+                                lines=lines, columns=columns, check=True):
+                            self.swap(neighbour)
+                        self.reset_board(touch)
                 except IndexError:
                     pass
                 self.pos = [pre_x, touch_y]
@@ -112,10 +134,27 @@ class CustomScatter(Scatter):
         anim = Animation(
             x=self.pre_pos[0], y=self.pre_pos[1],
             t='linear', duration=.2)
+        parent = self.parent
+        if parent:
+            anim.fbind('on_complete', parent.check_bubbles, [], [], False)
         anim.start(self)
 
     def on_touch_down(self, touch):
         super(CustomScatter, self).on_touch_down(touch)
+
+    def swap(self, neighbour):
+        neighbour_col = neighbour.col
+        neighbour_row = neighbour.row
+        neighbour_pre_pos = neighbour.pre_pos
+        neighbour.col = self.col
+        neighbour.row = self.row
+        neighbour.pre_pos = self.pre_pos
+        self.col = neighbour_col
+        self.row = neighbour_row
+        self.pre_pos = neighbour_pre_pos
+        board = self.parent
+        board.cols_fill[self.col][self.row] = self
+        board.cols_fill[neighbour.col][neighbour.row] = neighbour
 
     def get_neighbour(self, col, row):
         neighbour = None
@@ -123,6 +162,15 @@ class CustomScatter(Scatter):
                 len(self.parent.cols_fill[col]) > row >= 0):
             neighbour = self.parent.cols_fill[col][row]
         return neighbour
+
+    def get_line(self):
+        line = []
+        for col in self.parent.cols_fill:
+            line.append(col[self.row])
+        return line
+
+    def get_column(self):
+        return self.parent.cols_fill[self.col]
 
     def reset_board(self, touch):
         neighbours = [self,
@@ -140,12 +188,18 @@ class Board(FloatLayout):
     rows = NumericProperty(0)
     cols_fill = ListProperty([])
 
-    def clear_bubble(self):
+    def check_bubbles(self, lines=[], columns=[], check=False, *args, **kwargs):
         bulk = []
         for i in range(0, len(COLOR)):
-            same_colored = reduce(lambda x, y: x + y, (map(
-                lambda x: filter(
-                    lambda y: y.color_val == i, x), self.cols_fill)))
+            if not lines and not columns:
+                same_colored = list(set(reduce(lambda x, y: x + y, (map(
+                    lambda x: filter(
+                        lambda y: (y.color_val == i and
+                                   not y.cleared), x), self.cols_fill)))))
+            else:
+                same_colored = list(set(filter(
+                    lambda y: (y.color_val == i and
+                               not y.cleared), lines + columns)))
 
             for point in same_colored:
                 same_column = filter(
@@ -185,9 +239,112 @@ class Board(FloatLayout):
                         else:
                             break
                         i += 1
+        if check:
+            return bool(bulk)
+        else:
+            self.clear_bubbles(bulk)
 
+    def swift(self, *args, **kwargs):
+        columns = kwargs.get('columns', [])
+        index = kwargs.get('index', 0)
+        for column in columns:
+            # try:
+            #     column = columns[index]
+            # except IndexError:
+            #     return
+            selected_column = self.cols_fill[column]
+            bombed_rows = filter(
+                lambda x: x.cleared, selected_column
+            )
+            for bombed in bombed_rows:
+                self.remove_widget(bombed)
+
+            if bombed_rows:
+                self.parent.score += (10 * len(bombed_rows) +
+                                      ((len(bombed_rows) - 1) * 5))
+            filled_rows = sorted(
+                filter(
+                    lambda x: not x.cleared, selected_column),
+                key=lambda x: x.row
+            )
+
+            new_scatters = []
+            for bombed in bombed_rows:
+                scatter = CustomScatter(
+                    size=bombed.size, size_hint=(None, None),
+                    pos=(bombed.pos[0], self.upcoming + 100))
+                scatter.row = 10
+                scatter.col = column
+                scatter.pre_pos = (0, 0)
+                label = Label(size_hint=(None, None), size=bombed.size)
+                label.space = bombed.size[0] * 10 / 45
+                color = choice(COLOR)
+                color_index = COLOR.index(color)
+                set_color(label, color)
+                scatter.color_val = color_index
+                scatter.cleared = False
+                scatter.add_widget(label)
+                scatter.is_new = True
+                new_scatters.append(scatter)
+
+            if new_scatters:
+                filled_rows.extend(new_scatters)
+                pre_posses = map(lambda x: x.pre_pos, selected_column)
+
+                for scatter in filled_rows:
+                    scatter.row = filled_rows.index(scatter)
+                    scatter.pre_pos = pre_posses[scatter.row]
+                    if not scatter.parent:
+                        self.add_widget(scatter)
+                    selected_column[scatter.row] = scatter
+                # for scatter in filled_rows:
+                #     Animation.stop_all(scatter)
+                #     anim = Animation(y=scatter.pre_pos[1], t='linear', duration=.1)
+                #     anim.fbind(
+                #         'on_complete', self.swift, columns=columns,
+                #         index=index + 1)
+                #     anim.start(scatter)
+                self.change_pos(column=selected_column)
+
+    def change_pos(self, *args, **kwargs):
+        column = kwargs.get('column', [])
+        index = kwargs.get('index', 0)
+        try:
+            scatter = column[index]
+        except IndexError:
+            # self.check_bubbles()
+            # if columns:
+            #     self.swift(columns=columns, index=col_index)
+            return
+        anim = Animation(y=scatter.pre_pos[1], t='linear', duration=.05)
+        anim.fbind(
+            'on_complete', self.change_pos, column=column, index=index + 1)
+        anim.start(scatter)
+
+    def clear_bubbles(self, bulk):
+        # if Animation._instances:
+        def check_animation():
+            flag = False
+            for anim in Animation._instances:
+                if (anim._widgets and anim._widgets.values() and
+                        anim._widgets.values()[0].get(
+                        'widget', '').__class__ == CustomScatter().__class__):
+                    flag = True
+                    break
+            return flag
+
+        # if check_animation():
+        #     Clock.schedule_once(lambda dt: self.clear_bubbles(bulk), .2)
+        #     return
+        bulk = set(bulk)
+        cols = set([])
         for scatter in bulk:
-            set_color(scatter.children[0], get_color_from_hex('000000'))
+            Animation.stop_all(scatter)
+            scatter.cleared = True
+            cols.add(scatter.col)
+            # set_color(scatter.children[0], get_color_from_hex('303030'))
+        if cols:
+            self.swift(columns=list(cols))
 
 
 class KivyJewel(GridLayout):
@@ -203,6 +360,7 @@ class KivyJewel(GridLayout):
         try:
             row = column[index]
         except IndexError:
+            board.check_bubbles()
             return
         board.add_widget(row)
         anim = Animation(
@@ -216,10 +374,9 @@ class KivyJewel(GridLayout):
         for col in board.cols_fill:
             tmp = []
             for row in col:
-                row.pos = (row.pre_pos[0], 500)
+                row.pos = (row.pre_pos[0], board.upcoming)
                 tmp.append(row)
             self.fill_column(column=tmp)
-        board.clear_bubble()
 
     def prepare_board(self, size, padding):
         board = self.board
@@ -237,12 +394,14 @@ class KivyJewel(GridLayout):
                 scatter.row = row
                 scatter.col = col
                 scatter.pre_pos = pos
-                label = Label(text=str(i), size_hint=(None, None), size=size)
+                label = Label(text=str(""), size_hint=(None, None), size=size)
                 label.space = size[0] * 10 / 45
                 color = choice(COLOR)
                 color_index = COLOR.index(color)
                 set_color(label, color)
                 scatter.color_val = color_index
+                scatter.cleared = False
+                # label.text = str(color_index)
                 scatter.add_widget(label)
                 # board.add_widget(scatter)
                 label_count += 1
@@ -266,9 +425,11 @@ class KivyJewel(GridLayout):
                 tmp[col].append(widget)
 
     def resize_all(self, width, height):
+
         size = [
             min(width, height - (150 + 5 * self.board.cols)) /
             self.board.cols] * 2
+        self.board.upcoming = height - 100
         padding = (
             width - (size[0] * self.board.cols + 5 * self.board.cols)) / 2
         self.board.padding = (padding + 15, 50, padding, 50)
