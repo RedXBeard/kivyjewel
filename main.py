@@ -127,10 +127,8 @@ class CustomScatter(Scatter):
                 self.pos = [pre_x, touch_y]
 
     def on_bring_to_front(self, touch):
+        print self.pos, self.parent
         super(CustomScatter, self).on_bring_to_front(touch)
-
-    def on_touch_up(self, touch):
-        super(CustomScatter, self).on_touch_up(touch)
         anim = Animation(
             x=self.pre_pos[0], y=self.pre_pos[1],
             t='linear', duration=.2)
@@ -138,6 +136,16 @@ class CustomScatter(Scatter):
         if parent:
             anim.fbind('on_complete', parent.check_bubbles, [], [], False)
         anim.start(self)
+
+    def on_touch_up(self, touch):
+        super(CustomScatter, self).on_touch_up(touch)
+        # anim = Animation(
+        #     x=self.pre_pos[0], y=self.pre_pos[1],
+        #     t='linear', duration=.2)
+        # parent = self.parent
+        # if parent:
+        #     anim.fbind('on_complete', parent.check_bubbles, [], [], False)
+        # anim.start(self)
 
     def on_touch_down(self, touch):
         super(CustomScatter, self).on_touch_down(touch)
@@ -180,7 +188,8 @@ class CustomScatter(Scatter):
                       self.get_neighbour(self.col, self.row - 1)]
         for neighbour in neighbours:
             if neighbour:
-                neighbour.on_touch_up(touch)
+                # neighbour.on_touch_up(touch)
+                neighbour.on_bring_to_front(touch)
 
 
 class Board(FloatLayout):
@@ -190,7 +199,13 @@ class Board(FloatLayout):
 
     def check_bubbles(self, lines=[], columns=[], check=False, *args, **kwargs):
         bulk = []
+        # if not check:
+        #     print "called"
         for i in range(0, len(COLOR)):
+            # a = set(map(lambda x: "-".join(map(str, x.pre_pos)), list(set(reduce(lambda x, y: x + y, self.cols_fill))))).difference(
+            #     set(map(lambda x: "-".join(map(str, x.pos)), list(set(reduce(lambda x, y: x + y, self.cols_fill))))))
+            # if a and not check:
+            #     break
             if not lines and not columns:
                 same_colored = list(set(reduce(lambda x, y: x + y, (map(
                     lambda x: filter(
@@ -248,10 +263,6 @@ class Board(FloatLayout):
         columns = kwargs.get('columns', [])
         index = kwargs.get('index', 0)
         for column in columns:
-            # try:
-            #     column = columns[index]
-            # except IndexError:
-            #     return
             selected_column = self.cols_fill[column]
             bombed_rows = filter(
                 lambda x: x.cleared, selected_column
@@ -297,13 +308,6 @@ class Board(FloatLayout):
                     if not scatter.parent:
                         self.add_widget(scatter)
                     selected_column[scatter.row] = scatter
-                # for scatter in filled_rows:
-                #     Animation.stop_all(scatter)
-                #     anim = Animation(y=scatter.pre_pos[1], t='linear', duration=.1)
-                #     anim.fbind(
-                #         'on_complete', self.swift, columns=columns,
-                #         index=index + 1)
-                #     anim.start(scatter)
                 self.change_pos(column=selected_column)
 
     def change_pos(self, *args, **kwargs):
@@ -312,9 +316,6 @@ class Board(FloatLayout):
         try:
             scatter = column[index]
         except IndexError:
-            # self.check_bubbles()
-            # if columns:
-            #     self.swift(columns=columns, index=col_index)
             return
         anim = Animation(y=scatter.pre_pos[1], t='linear', duration=.05)
         anim.fbind(
@@ -322,7 +323,6 @@ class Board(FloatLayout):
         anim.start(scatter)
 
     def clear_bubbles(self, bulk):
-        # if Animation._instances:
         def check_animation():
             flag = False
             for anim in Animation._instances:
@@ -333,16 +333,13 @@ class Board(FloatLayout):
                     break
             return flag
 
-        # if check_animation():
-        #     Clock.schedule_once(lambda dt: self.clear_bubbles(bulk), .2)
-        #     return
         bulk = set(bulk)
         cols = set([])
         for scatter in bulk:
             Animation.stop_all(scatter)
             scatter.cleared = True
             cols.add(scatter.col)
-            # set_color(scatter.children[0], get_color_from_hex('303030'))
+            set_color(scatter.children[0], get_color_from_hex('303030'))
         if cols:
             self.swift(columns=list(cols))
 
